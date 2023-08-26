@@ -16,14 +16,14 @@ PAT = st.secrets.PAT
 USER_ID = st.secrets.USER_ID
 APP_ID = st.secrets.APP_ID
 # Change these to whatever model and text URL you want to use
-WORKFLOW_ID = 'Llama2TutorialWorkflow'
+WORKFLOW_ID = 'workflow-b4203b'
 
 ############################################################################
 # YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
 ############################################################################
 
 
-def get_response(prompt):
+def get_response(instagram_photo):
     channel = ClarifaiChannel.get_grpc_channel()
     stub = service_pb2_grpc.V2Stub(channel)
 
@@ -40,8 +40,8 @@ def get_response(prompt):
             inputs=[
                 resources_pb2.Input(
                     data=resources_pb2.Data(
-                        text=resources_pb2.Text(
-                            raw=prompt
+                        image=resources_pb2.Image(
+                            base64=instagram_photo
                         )
                     )
                 )
@@ -52,7 +52,6 @@ def get_response(prompt):
 
     if post_workflow_results_response.status.code != status_code_pb2.SUCCESS:
         print(post_workflow_results_response.status)
-
         return response
 
     # We'll get one WorkflowResult for each input we used above. Because of one input, we have here one WorkflowResult
@@ -71,3 +70,4 @@ def get_response(prompt):
     # Uncomment this line to print the full Response JSON
     # print(results)
     print(response)
+    return results
