@@ -1,58 +1,53 @@
 import streamlit as st
-from streamlit_chat import message
 import llama
+import blip
+from PIL import Image
+
+st.title("BLIP2 | Llama2 project")
 
 
-def clear_chat():
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Say something to get started!"}]
+##########################################################################
+# Context upload
+##########################################################################
+# Visual
+file_data = st.file_uploader(
+    "Upload Images", type=['jpg', 'png', 'jpeg'], accept_multiple_files=True)
+
+if file_data == None:
+    st.warning("File needs to be uploaded")
+    st.stop()
+
+# Written
+user_instructions = st.text_input("Anything else you want to add...")
+
+# holds until the done button is pushed haha
+result = st.button("Generate")
+if not result:
+    st.stop()
+
+image_bytes = []
+for f in file_data:
+    image = Image.open(f)
+    # st.image(image) #plots the image
+    image_bytes.append(f.getvalue())
 
 
-st.title("Llama2 Clarifai Tutorial")
+##########################################################################
+# INFERENCE
+##########################################################################
 
+with st.spinner('Extracting visual info from images...'):
+    visual_concepts = [blip.extract_visual_queues(ib) for ib in image_bytes]
 
-if "messages" not in st.session_state:
-    st.session_state["messages"] = [
-        {"role": "assistant", "content": "Say something to get started!"}]
+visual_concepts = ', '.join(visual_concepts)
+context = f'{user_instructions}. {visual_concepts}'
 
+with st.spinner('Generating letter...'):
+    love_letter = llama.generate_letter(context)
 
-with st.form("chat_input", clear_on_submit=True):
-    a, b = st.columns([4, 1])
+# with open("./theodore.txt", 'r') as f:
+#     style_reference = f.read()
+# with st.spinner('Refining initial renderings...'):
+#     love_letter = llama.style_transfer(love_letter, style_reference)
 
-    user_prompt = a.text_input(
-        label="Your message:",
-        placeholder="Type something...",
-        label_visibility="collapsed",
-    )
-
-    b.form_submit_button("Send", use_container_width=True)
-
-
-for msg in st.session_state.messages:
-    message(msg["content"], is_user=msg["role"] == "user")
-
-
-if user_prompt:
-
-    print('user_prompt: ', user_prompt)
-
-    st.session_state.messages.append({"role": "user", "content": user_prompt})
-
-    message(user_prompt, is_user=True)
-
-    # get response from llama2 API (in our case from Workflow we created before)
-    response = llama.get_response(user_prompt)
-
-    msg = {"role": "assistant", "content": response}
-
-    print('st.session_state.messages: ', st.session_state.messages)
-
-    st.session_state.messages.append(msg)
-
-    print('msg.content: ', msg["content"])
-
-    message(msg["content"])
-
-
-if len(st.session_state.messages) > 1:
-    st.button('Clear Chat', on_click=clear_chat)
+st.write(love_letter)

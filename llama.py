@@ -15,15 +15,14 @@ PAT = st.secrets.PAT
 # Since you're making inferences outside your app's scope
 USER_ID = st.secrets.USER_ID
 APP_ID = st.secrets.APP_ID
-# Change these to whatever model and text URL you want to use
-WORKFLOW_ID = 'Llama2TutorialWorkflow'
-
 ############################################################################
 # YOU DO NOT NEED TO CHANGE ANYTHING BELOW THIS LINE TO RUN THIS EXAMPLE
 ############################################################################
 
 
-def get_response(prompt):
+def generate_letter(raw):
+    WORKFLOW_ID = 'text-to-love-letter'
+
     channel = ClarifaiChannel.get_grpc_channel()
     stub = service_pb2_grpc.V2Stub(channel)
 
@@ -31,7 +30,47 @@ def get_response(prompt):
 
     userDataObject = resources_pb2.UserAppIDSet(user_id=USER_ID, app_id=APP_ID)
 
-    response = ""  # save response from the model
+    post_workflow_results_response = stub.PostWorkflowResults(
+        service_pb2.PostWorkflowResultsRequest(
+            user_app_id=userDataObject,
+            workflow_id=WORKFLOW_ID,
+            inputs=[
+                resources_pb2.Input(
+                    data=resources_pb2.Data(
+                        text=resources_pb2.Text(
+                            raw=raw  # pass our raw text data here
+                        )
+                    )
+                )
+            ]
+        ),
+        metadata=metadata
+    )
+    if post_workflow_results_response.status.code != status_code_pb2.SUCCESS:
+        print(post_workflow_results_response.status)
+        raise Exception("Post workflow results failed, status: " +
+                        post_workflow_results_response.status.description)
+
+    # We'll get one WorkflowResult for each input we used above. Because of one input, we have here one WorkflowResult
+    results = post_workflow_results_response.results[0]
+
+    return results.outputs[-1].data.text.raw
+
+
+def style_transfer(letter, style=None):
+    if style is None:
+        return letter
+
+    prompt = f'<s>[INST] <<SYS>>You are an editor who rewrites letters in a new style while retaining the content.<</SYS>>Only generate 1 letter and nothing else. Do not include emojis or enumeration.\n Style Examples: {style}\n Text: {letter}[/INST]\nLetter : </s>'
+
+    WORKFLOW_ID = 'style-transfer'
+
+    channel = ClarifaiChannel.get_grpc_channel()
+    stub = service_pb2_grpc.V2Stub(channel)
+
+    metadata = (('authorization', 'Key ' + PAT),)
+
+    userDataObject = resources_pb2.UserAppIDSet(user_id=USER_ID, app_id=APP_ID)
 
     post_workflow_results_response = stub.PostWorkflowResults(
         service_pb2.PostWorkflowResultsRequest(
@@ -49,25 +88,12 @@ def get_response(prompt):
         ),
         metadata=metadata
     )
-
     if post_workflow_results_response.status.code != status_code_pb2.SUCCESS:
         print(post_workflow_results_response.status)
-
-        return response
+        raise Exception("Post workflow results failed, status: " +
+                        post_workflow_results_response.status.description)
 
     # We'll get one WorkflowResult for each input we used above. Because of one input, we have here one WorkflowResult
     results = post_workflow_results_response.results[0]
 
-    # Each model we have in the workflow will produce one output.
-    for output in results.outputs:
-        model = output.model
-
-        print("Predicted concepts for the model `%s`" % model.id)
-        for concept in output.data.concepts:
-            print("	%s %.2f" % (concept.name, concept.value))
-
-        response += output.data.text.raw + "\n"
-
-    # Uncomment this line to print the full Response JSON
-    # print(results)
-    print(response)
+    return results.outputs[-1].data.text.raw
